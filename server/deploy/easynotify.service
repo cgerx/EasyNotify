@@ -1,0 +1,21 @@
+[Unit]
+Description=EasyNotify notification relay
+After=network.target
+
+[Service]
+Type=simple
+User=easynotify
+Group=easynotify
+ExecStart=/usr/local/bin/easynotify-server start --host 0.0.0.0 --port 8787 --config /etc/easynotify/config.json
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+Environment=GOMEMLIMIT=24MiB
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<style>
+:root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 14px; line-height: 1.7; }
+body { margin: 0; padding: 4px 0 28px; overflow-wrap: anywhere; color: #242a35; background: transparent; }
+h1,h2,h3 { line-height: 1.35; margin: 1.2em 0 .55em; } h1 { font-size: 23px; } h2 { font-size: 19px; } h3 { font-size: 16px; }
+p { margin: .65em 0; } a { color: #377dce; } ul,ol { padding-left: 24px; }
+pre { background: #f2f4f7; border: 1px solid #e5e8ed; border-radius: 8px; padding: 12px; overflow-x: auto; }
+code { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12px; } :not(pre)>code { background: #f0f2f5; padding: 2px 5px; border-radius: 4px; }
+blockquote { margin: 12px 0; padding-left: 14px; border-left: 3px solid #8ba9ca; color: #687080; }
+table { border-collapse: collapse; width: 100%; } th,td { text-align: left; border: 1px solid #ddd; padding: 7px; } hr { border: 0; border-top: 1px solid #ddd; }
+@media(prefers-color-scheme:dark) { body { color:#e0e4ed; } pre,:not(pre)>code { background:#252931; border-color:#363b45; } a { color:#7bb8ff; } blockquote { color:#a7b0c1; } th,td,hr { border-color:#414854; } }
+</style></head><body><main id="content"></main>
+<script>/*MARKED*/</script><script>/*PURIFY*/</script>
+<script>
+function renderMarkdown(text) {
+  return DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }), {
+    USE_PROFILES: { html: true }, FORBID_TAGS: ['style', 'img', 'input', 'form', 'video', 'audio'],
+    FORBID_ATTR: ['style'], ALLOW_DATA_ATTR: false
+  });
+}
+window.setMarkdown = encoded => {
+  const text = new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0)));
+  document.getElementById('content').innerHTML = renderMarkdown(text);
+  window.scrollTo(0, 0);
+};
+</script></body></html>

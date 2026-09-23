@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "easynotify": {
+      "command": "/absolute/path/to/EasyNotify/mcp/build/easynotify-mcp",
+      "env": {
+        "EASYNOTIFY_URL": "http://localhost:8787"
+      }
+    }
+  }
+}

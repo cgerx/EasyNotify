@@ -1,0 +1,24 @@
+{
+  "name": "easynotify",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "client"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build:go": "bash server/build.sh",
+    "build:linux": "bash server/build.sh --linux",
+    "build:client": "bash client/build.sh",
+    "test": "go test ./... && npm run build:go && node --test mcp/test/*.test.js client/test/*.test.js",
+    "test:native": "npm run build:go && bash client/test-native.sh",
+    "test:race": "go test -race ./...",
+    "server": "./server/build/easynotify-server"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.18.3"
+  }
+}

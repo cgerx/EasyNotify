@@ -1,0 +1,15 @@
+node_modules/
+client/build/
+.local/
+.DS_Store
+*.log
+server/build/
+server/dist/
+mcp/build/
+mcp/dist/
+dist/
+.env
+.env.*
+*.pem
+*.key
+.idea/
