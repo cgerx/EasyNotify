@@ -9,7 +9,53 @@ import Foundation
         throw NSError(domain: "NativeTest", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timed out: \(label)"])
     }
     static func emit(_ text: String) { print(text); fflush(stdout) }
+    @MainActor static func testUnread() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("EasyNotifyUnread-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = Store(directory: directory, deliverSystemNotifications: false)
+        defer { store.disconnect() }
+        let legacy = Data("[{\"id\":\"old\",\"title\":\"Old\",\"description\":\"history\",\"createdAt\":\"2026-01-01T00:00:00Z\"}]".utf8)
+        let migrated = try JSONDecoder().decode([Notice].self, from: legacy)
+        assert(migrated.first?.isUnread == false)
+        let first = Notice(id: "one", title: "One", description: "text", createdAt: "2026-01-01T00:00:00Z")
+        let second = Notice(id: "two", title: "Two", description: "text", createdAt: first.createdAt)
+        try store.receive(first)
+        try store.receive(second)
+        assert(store.unreadCount == 2) // Background auto-selection must not consume unread state.
+        let reloaded = Store(directory: directory, deliverSystemNotifications: false)
+        defer { reloaded.disconnect() }
+        assert(reloaded.unreadCount == 2)
+        store.settingsVisible = true
+        store.detailVisible = true
+        assert(store.unreadCount == 2)
+        store.settingsVisible = false
+        assert(store.unreadCount == 1) // Only the visible selection becomes read.
+        try store.receive(first)
+        assert(store.unreadCount == 1) // Replay cannot make a read message unread.
+        store.detailVisible = false
+        store.selected = second.id
+        assert(store.unreadCount == 1)
+        let history = directory.appendingPathComponent("messages.json")
+        let saved = try Data(contentsOf: history)
+        try FileManager.default.removeItem(at: history)
+        try FileManager.default.createDirectory(at: history, withIntermediateDirectories: false)
+        store.detailVisible = true
+        assert(store.unreadCount == 1) // Failed persistence must retain unread state.
+        try FileManager.default.removeItem(at: history)
+        try saved.write(to: history)
+        store.markVisibleMessageRead()
+        assert(store.unreadCount == 0)
+        let readReload = Store(directory: directory, deliverSystemNotifications: false)
+        defer { readReload.disconnect() }
+        assert(readReload.unreadCount == 0)
+        try store.receive(Notice(id: "three", title: "Three", description: "text", createdAt: first.createdAt))
+        assert(store.unreadCount == 1)
+        store.delete("three")
+        assert(store.unreadCount == 0)
+        emit("PASS: unread migration, background receive, selection, settings, replay, persistence failure, restart and deletion")
+    }
     @MainActor static func main() async throws {
+        try testUnread()
         let url = CommandLine.arguments[1]
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("EasyNotifyTests-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }

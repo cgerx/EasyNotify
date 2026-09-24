@@ -29,7 +29,13 @@ struct MainView: View {
                         List(selection: $store.selected) {
                             ForEach(store.messages) { notice in
                                 VStack(alignment: .leading, spacing: 7) {
-                                    Text(notice.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                                    HStack(spacing: 6) {
+                                        if notice.isUnread {
+                                            Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                                                .accessibilityLabel("未读")
+                                        }
+                                        Text(notice.title).font(.system(size: 13, weight: .semibold)).lineLimit(2)
+                                    }
                                     Text(notice.description.replacingOccurrences(of: "\n", with: " "))
                                         .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(2)
                                     Text(notice.date, format: .dateTime.month().day().hour().minute())

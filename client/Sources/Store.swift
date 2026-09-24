@@ -7,6 +7,8 @@ struct Notice: Codable, Identifiable, Hashable {
     let title: String
     let description: String
     let createdAt: String
+    var isRead: Bool? = nil
+    var isUnread: Bool { isRead == false }
     var date: Date {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -20,12 +22,14 @@ struct Configuration: Codable {
 
 @MainActor final class Store: NSObject, ObservableObject, URLSessionWebSocketDelegate {
     @Published var messages: [Notice] = []
-    @Published var selected: String?
+    @Published var selected: String? { didSet { markVisibleMessageRead() } }
     @Published var state = "未配置"
     @Published var connected = false
     @Published var error: String?
     @Published var configuration = Configuration()
-    @Published var settingsVisible = false
+    @Published var settingsVisible = false { didSet { markVisibleMessageRead() } }
+    var detailVisible = false { didSet { markVisibleMessageRead() } }
+    var unreadCount: Int { messages.filter(\.isUnread).count }
     let directory: URL
     private let deliverSystemNotifications: Bool
     private var session: URLSession!
@@ -90,6 +94,15 @@ struct Configuration: Codable {
         catch { self.error = "无法删除消息：\(error.localizedDescription)"; return }
         messages = next
         if selected == id { selected = messages.first?.id }
+    }
+    func markVisibleMessageRead() {
+        guard detailVisible, !settingsVisible, let id = selected,
+              let index = messages.firstIndex(where: { $0.id == id && $0.isUnread }) else { return }
+        var next = messages
+        next[index].isRead = true
+        do { try persist(next, name: "messages.json") }
+        catch { self.error = "无法保存已读状态：\(error.localizedDescription)"; return }
+        messages = next
     }
     func connect() {
         disconnect()
@@ -171,7 +184,9 @@ struct Configuration: Codable {
     func receive(_ notice: Notice) throws {
         // Existing IDs were persisted successfully; replay only needs another ACK.
         guard !messages.contains(where: { $0.id == notice.id }) else { return }
-        let next = [notice] + messages
+        var incoming = notice
+        incoming.isRead = false
+        let next = [incoming] + messages
         do { try persist(next, name: "messages.json") }
         catch {
             self.error = "无法保存消息，将在重连后重试：\(error.localizedDescription)"

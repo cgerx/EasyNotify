@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import UserNotifications
 
@@ -6,6 +7,7 @@ import UserNotifications
     var store: Store!
     var window: NSWindow!
     var statusItem: NSStatusItem!
+    private var unreadSubscription: AnyCancellable?
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
            let icon = NSImage(contentsOf: iconURL) {
@@ -49,9 +51,16 @@ import UserNotifications
         window.contentView = NSHostingView(rootView: MainView(store: store))
         window.center()
         window.setFrameAutosaveName("EasyNotifyMain")
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "bell", accessibilityDescription: "EasyNotify")
-        statusItem.button?.toolTip = "EasyNotify"
+        statusItem.button?.imagePosition = .imageLeading
+        statusItem.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        unreadSubscription = store.$messages.map { $0.filter(\.isUnread).count }
+            .removeDuplicates().sink { [weak self] count in
+                self?.statusItem.button?.title = count > 0 ? " \(count)" : ""
+                self?.statusItem.button?.toolTip = count > 0 ? "EasyNotify · \(count) 条未读" : "EasyNotify"
+                NSApp.dockTile.badgeLabel = count > 0 ? String(count) : nil
+            }
         let menu = NSMenu()
         menu.addItem(withTitle: "打开通知", action: #selector(showWindow), keyEquivalent: "")
         menu.addItem(withTitle: "设置…", action: #selector(showSettings), keyEquivalent: ",")
@@ -71,11 +80,20 @@ import UserNotifications
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
+    func windowDidBecomeKey(_ notification: Notification) {
+        guard notification.object as? NSWindow === window else { return }
+        store.detailVisible = true
+    }
+    func windowDidResignKey(_ notification: Notification) {
+        guard notification.object as? NSWindow === window else { return }
+        store.detailVisible = false
+    }
     func windowWillClose(_ notification: Notification) {
         guard let closingWindow = notification.object as? NSWindow, closingWindow === window else { return }
+        store.detailVisible = false
         NSApp.setActivationPolicy(.accessory)
     }
-    @objc func showSettings() { showWindow(); store.settingsVisible = true }
+    @objc func showSettings() { store.settingsVisible = true; showWindow() }
     @objc func quit() { NSApp.terminate(nil) }
     @objc func wake() { store.connect() }
     @objc func sleep() { store.disconnect(); store.state = "已暂停" }
