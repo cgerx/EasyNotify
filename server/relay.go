@@ -68,6 +68,7 @@ type Relay struct {
 	retryInterval time.Duration
 	queue         []Message
 	maxQueue      int
+	bark          *barkSender
 }
 
 func New(key string) (*Relay, error) {
@@ -75,6 +76,19 @@ func New(key string) (*Relay, error) {
 		return nil, err
 	}
 	return &Relay{key: key, clients: make(map[*receiver]struct{}), pingInterval: 20 * time.Second, retryInterval: 5 * time.Second, maxQueue: 10000}, nil
+}
+
+// NewWithConfig enables optional independent Bark delivery.
+func NewWithConfig(config Config) (*Relay, error) {
+	r, err := New(config.Key)
+	if err != nil {
+		return nil, err
+	}
+	r.bark, err = newBarkSender(config.Bark)
+	if err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 func reply(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -146,12 +160,16 @@ func (r *Relay) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	idBytes[8] = (idBytes[8] & 0x3f) | 0x80
 	id := fmt.Sprintf("%x-%x-%x-%x-%x", idBytes[:4], idBytes[4:6], idBytes[6:8], idBytes[8:10], idBytes[10:])
 	r.mu.Lock()
-	if r.closed || len(r.queue) >= r.maxQueue {
+	if r.closed || len(r.queue) >= r.maxQueue || (r.bark != nil && len(r.bark.queue) == cap(r.bark.queue)) {
 		r.mu.Unlock()
 		failure(w, 503, "Queue unavailable or full. Message was not accepted.")
 		return
 	}
-	r.queue = append(r.queue, Message{id, input.Title, input.Description, time.Now().UTC().Format("2006-01-02T15:04:05.000Z")})
+	message := Message{id, input.Title, input.Description, time.Now().UTC().Format("2006-01-02T15:04:05.000Z")}
+	r.queue = append(r.queue, message)
+	if r.bark != nil {
+		r.bark.queue <- message
+	}
 	r.wakeLocked()
 	r.mu.Unlock()
 	reply(w, 200, map[string]any{"id": id, "accepted": true})
@@ -271,6 +289,9 @@ func (r *Relay) subscribe(w http.ResponseWriter, req *http.Request) {
 func (r *Relay) Close() {
 	r.mu.Lock()
 	r.closed = true
+	if r.bark != nil {
+		r.bark.cancel()
+	}
 	for client := range r.clients {
 		_ = client.conn.Close()
 	}

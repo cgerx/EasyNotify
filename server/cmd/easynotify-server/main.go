@@ -80,18 +80,18 @@ func run() error {
 		fmt.Fprintln(os.Stderr, "Key saved. Restart relay to apply.")
 		return nil
 	case "start":
-		key := os.Getenv("EASYNOTIFY_KEY")
-		if key == "" {
-			key, err = server.LoadKey(*config)
-			if err != nil {
-				return fmt.Errorf("cannot read key; run the key command first: %w", err)
-			}
+		settings, err := server.LoadConfig(*config)
+		if err != nil && !(os.IsNotExist(err) && os.Getenv("EASYNOTIFY_KEY") != "") {
+			return fmt.Errorf("cannot read configuration; run the key command first: %w", err)
+		}
+		if key := os.Getenv("EASYNOTIFY_KEY"); key != "" {
+			settings.Key = key
 		}
 		number, err := strconv.Atoi(*port)
 		if err != nil || number < 0 || number > 65535 {
 			return errors.New("port must be 0–65535 (0 selects a free port)")
 		}
-		relay, err := server.New(key)
+		relay, err := server.NewWithConfig(settings)
 		if err != nil {
 			return err
 		}

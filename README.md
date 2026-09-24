@@ -93,6 +93,30 @@ JSON
 
 发送接口无需密钥，任何能访问它的人都可以发送通知；接收连接需要密钥。HTTP 默认明文传输，请按使用范围限制网络访问，需要加密时在前面配置 HTTPS 反向代理，客户端填写 `https://你的域名`。
 
+## 在 iPhone 上接收（Bark）
+
+从 App Store 安装 Bark 并允许通知，将 Bark 的 Device Key 填入服务器的私有 `config.json`。Mac 客户端无需升级，同一条 `/notify` 请求会分别投递到 Mac 和 Bark。
+
+```json
+{
+  "key": "你的现有接收密钥",
+  "bark": {
+    "enabled": true,
+    "endpoint": "https://api.day.app/push",
+    "device_key": "你的 Bark Device Key",
+    "group": "EasyNotify"
+  }
+}
+```
+
+`endpoint`、`group` 可省略，默认值如上；自建 Bark 时，将 `endpoint` 改成自己的 `/push` 地址。未配置 Bark 或 `enabled` 为 `false` 时，仅使用原有 Mac 投递。修改后重启服务：`sudo systemctl restart easynotify`。配置文件应仅允许管理员与服务账号读取，真实密钥不要提交到仓库。
+
+标题发送到 Bark 的 `title`，描述发送到 `markdown`，并启用消息归档。Bark 在后台使用 Apple APNs 接收通知，不需要手机常驻应用，也不需要你购买 Apple 开发者会员。
+
+Bark 使用独立的内存队列，Mac 的确认不会取消 Bark 推送。网络错误、HTTP 429/5xx 等暂时故障最多尝试 3 次，每次请求超时 10 秒，重试间隔为 1、2 秒；永久错误或重试耗尽会记录不含密钥的失败日志。两条队列各最多等待 10,000 条，任一队列满时整个请求返回 503，不接受本条消息。Bark 请求不会阻塞 Mac 投递。
+
+`accepted: true` 只表示已进入队列，Bark 返回成功也不代表手机已展示通知。服务重启会丢失内存中的待投递消息；网络超时重试可能重复投递。可通过 `journalctl -u easynotify` 查看 Bark 接收或失败记录。修改接收密钥的 `key` 命令会保留 Bark 配置。
+
 ## 给 AI Agent 配置 MCP
 
 MCP 使用 stdio，由 Agent 启动。在运行 Agent 的机器上放好对应平台的 `easynotify-mcp`，配置如下：
